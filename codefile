@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Code Editor</title>
+  <style>
+    :root {
+      --bg-dark: #0f1117;
+      --bg-editor: #161822;
+      --bg-panel: #1e2130;
+      --border-color: #2b2f42;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --danger: #ef4444;
+      --success: #10b981;
+      --warning: #f59e0b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* TOP NAVBAR */
+    header {
+      height: 48px;
+      min-height: 48px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1rem;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    .brand-icon {
+      width: 16px;
+      height: 16px;
+      background: var(--accent);
+      border-radius: 4px;
+      display: inline-block;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn {
+      background: var(--bg-editor);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: 0.15s;
+    }
+
+    .btn:hover { background: var(--border-color); }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+
+    .btn-danger:hover { background: var(--danger); border-color: var(--danger); }
+
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .toggle-label input { accent-color: var(--accent); }
+
+    /* WORKSPACE */
+    .workspace {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+      height: calc(100% - 48px);
+    }
+
+    /* EDITOR */
+    .editor-section {
+      width: 50%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-editor);
+      min-width: 150px;
+    }
+
+    .tabs-bar {
+      display: flex;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border-color);
+      height: 38px;
+      min-height: 38px;
+    }
+
+    .tab-btn {
+      padding: 0 16px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-right: 1px solid var(--border-color);
+      border-top: 2px solid transparent;
+      transition: 0.15s;
+    }
+
+    .tab-btn.active {
+      background: var(--bg-editor);
+      color: var(--text-main);
+      border-top-color: var(--accent);
+    }
+
+    .tab-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot-html { background: #e44d26; }
+    .dot-css { background: #264de4; }
+    .dot-js { background: #f7df1e; }
+
+    .code-containers {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .editor-pane {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: row;
+      height: 100%;
+    }
+
+    .editor-pane.active { display: flex; }
+
+    .gutter {
+      width: 44px;
+      background: var(--bg-editor);
+      border-right: 1px solid var(--border-color);
+      padding: 12px 6px;
+      color: #4b526d;
+      font-family: monospace;
+      font-size: 13px;
+      line-height: 20px;
+      text-align: right;
+      overflow: hidden;
+      white-space: pre;
+    }
+
+    .code-input {
+      flex: 1;
+      height: 100%;
+      background: transparent;
+      border: none;
+      color: #e2e8f0;
+      padding: 12px;
+      font-family: monospace;
+      font-size: 13px;
+      line-height: 20px;
+      resize: none;
+      outline: none;
+      white-space: pre;
+      overflow: auto;
+      tab-size: 2;
+    }
+
+    /* RESIZER */
+    .resizer {
+      width: 6px;
+      background: var(--border-color);
+      cursor: col-resize;
+      z-index: 5;
+    }
+    .resizer:hover, .resizer.dragging { background: var(--accent); }
+
+    /* PREVIEW */
+    .preview-section {
+      flex: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: #ffffff;
+      min-width: 150px;
+    }
+
+    .preview-header {
+      height: 38px;
+      min-height: 38px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    .view-modes { display: flex; gap: 4px; }
+
+    .view-btn {
+      padding: 3px 8px;
+      font-size: 0.75rem;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .view-btn.active {
+      border-color: var(--border-color);
+      background: var(--bg-editor);
+      color: var(--text-main);
+    }
+
+    .iframe-wrapper {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      background: #090a0f;
+      overflow: hidden;
+    }
+
+    #preview-frame {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #ffffff;
+    }
+
+    /* CONSOLE */
+    .console-panel {
+      height: 120px;
+      background: var(--bg-dark);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      transition: height 0.2s;
+    }
+
+    .console-panel.collapsed { height: 28px; }
+
+    .console-header {
+      height: 28px;
+      min-height: 28px;
+      background: var(--bg-panel);
+      padding: 0 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .console-logs {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 12px;
+      font-family: monospace;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .log-item { padding: 3px 0; border-bottom: 1px solid #1e2230; word-break: break-all; }
+    .log-info { color: #94a3b8; }
+    .log-warn { color: var(--warning); }
+    .log-error { color: var(--danger); font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span class="brand-icon"></span>
+      <span>LiveStudio</span>
+    </div>
+
+    <div class="toolbar">
+      <label class="toggle-label">
+        <input type="checkbox" id="auto-run-toggle" checked>
+        <span>Auto-Run</span>
+      </label>
+
+      <button class="btn btn-primary" id="btn-run">▶ Run</button>
+      <button class="btn" id="btn-export">Export</button>
+      <button class="btn btn-danger" id="btn-clear">Clear</button>
+      <button class="btn" id="btn-fullscreen">⛶</button>
+    </div>
+  </header>
+
+  <main class="workspace" id="workspace">
+    <!-- EDITOR -->
+    <section class="editor-section" id="editor-section">
+      <div class="tabs-bar">
+        <button class="tab-btn active" data-lang="html"><span class="tab-dot dot-html"></span>HTML</button>
+        <button class="tab-btn" data-lang="css"><span class="tab-dot dot-css"></span>CSS</button>
+        <button class="tab-btn" data-lang="js"><span class="tab-dot dot-js"></span>JavaScript</button>
+      </div>
+
+      <div class="code-containers">
+        <div class="editor-pane active" id="pane-html">
+          <div class="gutter" id="gutter-html">1</div>
+          <textarea class="code-input" id="code-html" spellcheck="false"></textarea>
+        </div>
+        <div class="editor-pane" id="pane-css">
+          <div class="gutter" id="gutter-css">1</div>
+          <textarea class="code-input" id="code-css" spellcheck="false"></textarea>
+        </div>
+        <div class="editor-pane" id="pane-js">
+          <div class="gutter" id="gutter-js">1</div>
+          <textarea class="code-input" id="code-js" spellcheck="false"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <div class="resizer" id="resizer"></div>
+
+    <!-- PREVIEW -->
+    <section class="preview-section">
+      <div class="preview-header">
+        <span>PREVIEW</span>
+        <div class="view-modes">
+          <button class="view-btn active" data-width="100%">Desktop</button>
+          <button class="view-btn" data-width="768px">Tablet</button>
+          <button class="view-btn" data-width="375px">Mobile</button>
+        </div>
+      </div>
+
+      <div class="iframe-wrapper">
+        <iframe id="preview-frame"></iframe>
+      </div>
+
+      <div class="console-panel" id="console-panel">
+        <div class="console-header" id="console-toggle">
+          <span>CONSOLE (<span id="log-count">0</span>)</span>
+          <span>▲ / ▼</span>
+        </div>
+        <div class="console-logs" id="console-logs"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // 1. SAFE STORAGE (PREVENTS JAVI CRASH)
+    const memoryStore = {};
+    function safeGet(key, fallback) {
+      try {
+        const val = localStorage.getItem(key);
+        return val !== null ? val : fallback;
+      } catch (e) {
+        return memoryStore[key] !== undefined ? memoryStore[key] : fallback;
+      }
+    }
+    function safeSet(key, val) {
+      try {
+        localStorage.setItem(key, val);
+      } catch (e) {
+        memoryStore[key] = val;
+      }
+    }
+
+    // 2. STARTER CONTENT
+    const STARTER = {
+      html: '',
+      css: '',
+      js: ''
+    };
+
+    // DOM ELEMENTS
+    const codeHtml = document.getElementById('code-html');
+    const codeCss = document.getElementById('code-css');
+    const codeJs = document.getElementById('code-js');
+    const gutterHtml = document.getElementById('gutter-html');
+    const gutterCss = document.getElementById('gutter-css');
+    const gutterJs = document.getElementById('gutter-js');
+    const previewFrame = document.getElementById('preview-frame');
+    const autoRunToggle = document.getElementById('auto-run-toggle');
+    const consoleLogs = document.getElementById('console-logs');
+    const logCountEl = document.getElementById('log-count');
+
+    let logCounter = 0;
+    let debounceTimer = null;
+
+    // LOAD INITIAL CODE SAFELY
+    codeHtml.value = safeGet('ed_html', STARTER.html);
+    codeCss.value = safeGet('ed_css', STARTER.css);
+    codeJs.value = safeGet('ed_js', STARTER.js);
+
+    // LINE NUMBER GUTTERS
+    function updateGutter(editor, gutter) {
+      const lines = editor.value.split('\n').length;
+      gutter.innerText = Array.from({ length: lines }, (_, i) => i + 1).join('\n');
+    }
+
+    [
+      [codeHtml, gutterHtml],
+      [codeCss, gutterCss],
+      [codeJs, gutterJs]
+    ].forEach(([editor, gutter]) => {
+      editor.addEventListener('input', () => {
+        updateGutter(editor, gutter);
+        if (autoRunToggle.checked) {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(runPreview, 400);
+        }
+      });
+
+      editor.addEventListener('scroll', () => {
+        gutter.scrollTop = editor.scrollTop;
+      });
+
+      editor.addEventListener('keydown', (e) => {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          const start = editor.selectionStart;
+          const end = editor.selectionEnd;
+          editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
+          editor.selectionStart = editor.selectionEnd = start + 2;
+          updateGutter(editor, gutter);
+        }
+      });
+
+      updateGutter(editor, gutter);
+    });
+
+    // RUN PREVIEW
+    function runPreview() {
+      consoleLogs.innerHTML = '';
+      logCounter = 0;
+      logCountEl.innerText = '0';
+
+      const html = codeHtml.value;
+      const css = codeCss.value;
+      const js = codeJs.value;
+
+      safeSet('ed_html', html);
+      safeSet('ed_css', css);
+      safeSet('ed_js', js);
+
+      const closeScript = '<' + '/script>';
+      const payload = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>${css}</style>
+  <script>
+    (function() {
+      function send(type, args) {
+        const text = Array.from(args).map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+        window.parent.postMessage({ fromEditor: true, level: type, text: text }, '*');
+      }
+      const _log = console.log, _warn = console.warn, _error = console.error;
+      console.log = (...args) => { send('info', args); _log(...args); };
+      console.warn = (...args) => { send('warn', args); _warn(...args); };
+      console.error = (...args) => { send('error', args); _error(...args); };
+      window.onerror = (msg, _, line) => send('error', [msg + ' (Line ' + line + ')']);
+    })();
+  ${closeScript}
+</head>
+<body>
+  ${html}
+  <script>
+    try {
+      ${js}
+    } catch(err) {
+      console.error(err.message);
+    }
+  ${closeScript}
+</body>
+</html>`;
+
+      // Use srcdoc with data URL fallback
+      previewFrame.srcdoc = payload;
+    }
+
+    // RECEIVE CONSOLE MESSAGES
+    window.addEventListener('message', (e) => {
+      if (e.data && e.data.fromEditor) {
+        logCounter++;
+        logCountEl.innerText = logCounter;
+        const entry = document.createElement('div');
+        entry.className = `log-item log-${e.data.level}`;
+        entry.innerText = `[${e.data.level.toUpperCase()}] ${e.data.text}`;
+        consoleLogs.appendChild(entry);
+        consoleLogs.scrollTop = consoleLogs.scrollHeight;
+      }
+    });
+
+    // CONSOLE DRAWER TOGGLE
+    document.getElementById('console-toggle').addEventListener('click', () => {
+      document.getElementById('console-panel').classList.toggle('collapsed');
+    });
+
+    // TAB SWITCHING
+    document.querySelectorAll('.tab-btn').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.editor-pane').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(`pane-${tab.dataset.lang}`).classList.add('active');
+      });
+    });
+
+    // DRAGGABLE RESIZER
+    const resizer = document.getElementById('resizer');
+    const editorSec = document.getElementById('editor-section');
+    const workspace = document.getElementById('workspace');
+    let dragging = false;
+
+    resizer.addEventListener('mousedown', () => {
+      dragging = true;
+      resizer.classList.add('dragging');
+      previewFrame.style.pointerEvents = 'none';
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const rect = workspace.getBoundingClientRect();
+      const w = e.clientX - rect.left;
+      if (w > 100 && w < rect.width - 100) {
+        editorSec.style.width = w + 'px';
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (dragging) {
+        dragging = false;
+        resizer.classList.remove('dragging');
+        previewFrame.style.pointerEvents = 'auto';
+      }
+    });
+
+    // RESPONSIVE SIZING
+    document.querySelectorAll('.view-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        previewFrame.style.width = btn.dataset.width;
+      });
+    });
+
+    // TOOLBAR BUTTONS
+    document.getElementById('btn-run').addEventListener('click', runPreview);
+
+    document.getElementById('btn-clear').addEventListener('click', () => {
+      codeHtml.value = '';
+      codeCss.value = '';
+      codeJs.value = '';
+      updateGutter(codeHtml, gutterHtml);
+      updateGutter(codeCss, gutterCss);
+      updateGutter(codeJs, gutterJs);
+      runPreview();
+    });
+
+    document.getElementById('btn-export').addEventListener('click', () => {
+      const fullDoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${codeCss.value}<\/style></head><body>${codeHtml.value}<script>${codeJs.value}<\/script></body></html>`;
+      const blob = new Blob([fullDoc], { type: 'text/html' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'project.html';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    document.getElementById('btn-fullscreen').addEventListener('click', () => {
+      try {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        } else {
+          document.exitFullscreen().catch(() => {});
+        }
+      } catch (err) {}
+    });
+
+    // INITIAL RENDER
+    runPreview();
+  </script>
+</body>
+</html>
